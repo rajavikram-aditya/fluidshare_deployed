@@ -1,0 +1,243 @@
+/* =============================================
+   FLUIDSHARE — LOADER STYLES
+   loader.css
+============================================= */
+
+#loader {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
+    transition: opacity 0.6s ease, visibility 0.6s ease;
+}
+
+#loader.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+/* Grid overlay */
+#loader::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 60px 60px;
+    opacity: 0.2;
+    pointer-events: none;
+}
+
+/* ---- Falling particles ---- */
+.particles {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.particle {
+    position: absolute;
+    width: 1px;
+    background: linear-gradient(to bottom, transparent, var(--accent), transparent);
+    opacity: 0;
+    animation: particleFall linear infinite;
+}
+
+@keyframes particleFall {
+    0%   { transform: translateY(-100px); opacity: 0; }
+    10%  { opacity: 0.6; }
+    90%  { opacity: 0.3; }
+    100% { transform: translateY(110vh); opacity: 0; }
+}
+
+/* ---- Logo block ---- */
+.loader-logo {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    animation: loaderFadeIn 0.5s ease both;
+}
+
+.loader-mark {
+    position: relative;
+    width: 64px;
+    height: 64px;
+}
+
+.loader-mark svg {
+    width: 64px;
+    height: 64px;
+}
+
+/* Outer spinning ring */
+.ring-outer {
+    position: absolute;
+    inset: -12px;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    border-top-color: var(--accent);
+    border-right-color: rgba(110, 231, 183, 0.2);
+    animation: loaderSpin 1.8s linear infinite;
+}
+
+/* Inner spinning ring (opposite direction) */
+.ring-inner {
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    border-bottom-color: var(--send);
+    border-left-color: rgba(167, 139, 250, 0.2);
+    animation: loaderSpin 1.2s linear infinite reverse;
+}
+
+@keyframes loaderSpin {
+    to { transform: rotate(360deg); }
+}
+
+/* Diamond SVG paths */
+.loader-diamond {
+    animation: diamondPulse 2s ease-in-out infinite;
+    stroke: var(--accent);
+}
+
+.loader-dot-center {
+    animation: dotPulse 2s ease-in-out infinite;
+    fill: var(--accent);
+}
+
+@keyframes diamondPulse {
+    0%, 100% { stroke: var(--accent); opacity: 1; }
+    50%       { stroke: var(--send);  opacity: 0.7; }
+}
+
+@keyframes dotPulse {
+    0%, 100% { fill: var(--accent); }
+    50%       { fill: var(--send); }
+}
+
+/* Logo wordmark */
+.loader-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--text);
+}
+
+.loader-name span {
+    color: var(--accent);
+}
+
+/* ---- Status dots + message ---- */
+.loader-status {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    animation: loaderFadeIn 0.5s 0.2s ease both;
+}
+
+.loader-steps {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.step-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.3s, box-shadow 0.3s;
+}
+
+.step-dot.active {
+    background: var(--accent);
+    box-shadow: 0 0 8px rgba(110, 231, 183, 0.5);
+}
+
+.step-dot.done {
+    background: var(--text-dim);
+}
+
+#loader-message {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    min-width: 240px;
+    text-align: center;
+    transition: opacity 0.3s;
+}
+
+/* ---- Progress bar ---- */
+.loader-bar-track {
+    position: relative;
+    z-index: 1;
+    width: 200px;
+    height: 2px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    animation: loaderFadeIn 0.5s 0.3s ease both;
+}
+
+.loader-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--send), var(--accent));
+    border-radius: 2px;
+    transition: width 0.5s ease;
+    box-shadow: 0 0 10px var(--accent);
+}
+
+/* ---- Keyframes ---- */
+@keyframes loaderFadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- Credit line ---- */
+.loader-credit {
+    position: relative;
+    z-index: 1;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    animation: loaderFadeIn 0.5s 0.4s ease both;
+}
+
+.loader-credit span {
+    color: var(--accent);
+    font-weight: 500;
+    position: relative;
+}
+
+.loader-credit span::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: var(--accent);
+    opacity: 0.4;
+    border-radius: 1px;
+}
