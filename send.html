@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUS · FluidShare — Send a File</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="loader.css">
+    <style>
+        .page-inner {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 36px 20px 60px;
+        }
+
+        .page-header {
+            width: 100%;
+            max-width: 560px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 40px;
+            animation: fadeUp 0.5s ease both;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--surface);
+            transition: border-color 0.2s, color 0.2s;
+        }
+        .back-btn:hover {
+            border-color: var(--border-hover);
+            color: var(--text);
+        }
+
+        .single-card {
+            width: 100%;
+            max-width: 560px;
+            animation: fadeUp 0.5s 0.15s ease both;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ===== LOADING SCREEN ===== -->
+<div id="loader">
+    <div class="particles" id="particles"></div>
+    <div class="loader-logo">
+        <div class="loader-mark">
+            <div class="ring-outer"></div>
+            <div class="ring-inner"></div>
+            <svg viewBox="0 0 64 64" fill="none">
+                <path class="loader-diamond" d="M32 8 L56 32 L32 56 L8 32 Z" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+                <circle class="loader-dot-center" cx="32" cy="32" r="4"/>
+            </svg>
+        </div>
+        <div class="loader-name">Fluid<span>Share</span></div>
+    </div>
+    <div class="loader-status">
+        <div class="loader-steps">
+            <div class="step-dot active" id="dot-0"></div>
+            <div class="step-dot" id="dot-1"></div>
+            <div class="step-dot" id="dot-2"></div>
+        </div>
+        <div id="loader-message">Initializing…</div>
+    </div>
+    <div class="loader-bar-track">
+        <div class="loader-bar-fill" id="loader-bar"></div>
+    </div>
+    <div class="loader-credit">crafted by <span>Aditya Vikram</span></div>
+</div>
+
+<!-- ===== APP ===== -->
+<div id="app">
+<div class="page-inner">
+
+    <div class="page-header">
+        <div class="logo">
+            <div class="logo-sus-badge">
+                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span class="logo-sus-text">SUS</span>
+            </div>
+            <div class="logo-divider"></div>
+            <div class="logo-name">Fluid<span>Share</span></div>
+        </div>
+        <a href="index.html" class="back-btn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            Back
+        </a>
+    </div>
+
+    <div class="single-card">
+        <div class="card send" style="max-width:100%;">
+            <div class="card-header">
+                <div class="card-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                </div>
+                <div class="card-badge">Send</div>
+            </div>
+
+            <div>
+                <div class="card-title">Share a File</div>
+                <div class="card-subtitle">Create a room key, set a password, and let someone connect to grab your file.</div>
+            </div>
+
+            <div class="drop-zone" id="drop-zone">
+                <input type="file" id="file-input" />
+                <div class="drop-zone-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="12" y1="13" x2="12" y2="17"/>
+                        <polyline points="9 16 12 13 15 16"/>
+                    </svg>
+                </div>
+                <div class="drop-zone-label">
+                    <strong>Click or drag a file here</strong>
+                    Any format · any size
+                </div>
+                <div id="file-name"></div>
+            </div>
+
+            <div class="divider">room key</div>
+
+            <div class="field">
+                <label>Your Room Key</label>
+                <div class="input-row">
+                    <input type="text" id="sender-room-key" placeholder="e.g. glacier-42" />
+                    <button class="btn btn-send" onclick="generateKey()">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                            <path d="M23 7l-7 5 7 5V7z"/>
+                            <rect x="1" y="5" width="15" height="14" rx="2"/>
+                        </svg>
+                        Auto
+                    </button>
+                </div>
+            </div>
+
+            <div class="divider">encryption</div>
+
+            <div class="field">
+                <label>Password (optional)</label>
+                <div class="password-row">
+                    <input type="password" id="sender-password" placeholder="Set a shared password…" />
+                    <button class="toggle-pw-btn" onclick="togglePassword('sender-password', this)" title="Toggle visibility">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <button class="btn btn-send btn-full" onclick="createRoomAndShare()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                </svg>
+                Create Room &amp; Share
+            </button>
+
+            <button class="btn btn-copy" id="btn-copy-link" onclick="copyShareLink()" style="display:none;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+                Copy Share Link
+            </button>
+
+            <div class="progress-container" id="sender-progress">
+                <div class="progress-bar-track">
+                    <div class="progress-bar-fill" id="sender-progress-fill"></div>
+                </div>
+                <div class="progress-info">
+                    <span class="pct" id="sender-pct">0%</span>
+                    <span id="sender-speed"></span>
+                </div>
+            </div>
+
+            <div class="status-bar" id="sender-status">Waiting for setup…</div>
+        </div>
+    </div>
+
+</div>
+</div>
+
+<script src="script.js"></script>
+<script src="loader.js"></script>
+</body>
+</html>

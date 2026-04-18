@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUS · FluidShare — Receive a File</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="loader.css">
+    <style>
+        .page-inner {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 36px 20px 60px;
+        }
+
+        .page-header {
+            width: 100%;
+            max-width: 560px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 40px;
+            animation: fadeUp 0.5s ease both;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--surface);
+            transition: border-color 0.2s, color 0.2s;
+        }
+        .back-btn:hover {
+            border-color: var(--border-hover);
+            color: var(--text);
+        }
+
+        .single-card {
+            width: 100%;
+            max-width: 560px;
+            animation: fadeUp 0.5s 0.15s ease both;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ===== LOADING SCREEN ===== -->
+<div id="loader">
+    <div class="particles" id="particles"></div>
+    <div class="loader-logo">
+        <div class="loader-mark">
+            <div class="ring-outer"></div>
+            <div class="ring-inner"></div>
+            <svg viewBox="0 0 64 64" fill="none">
+                <path class="loader-diamond" d="M32 8 L56 32 L32 56 L8 32 Z" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+                <circle class="loader-dot-center" cx="32" cy="32" r="4"/>
+            </svg>
+        </div>
+        <div class="loader-name">Fluid<span>Share</span></div>
+    </div>
+    <div class="loader-status">
+        <div class="loader-steps">
+            <div class="step-dot active" id="dot-0"></div>
+            <div class="step-dot" id="dot-1"></div>
+            <div class="step-dot" id="dot-2"></div>
+        </div>
+        <div id="loader-message">Initializing…</div>
+    </div>
+    <div class="loader-bar-track">
+        <div class="loader-bar-fill" id="loader-bar"></div>
+    </div>
+    <div class="loader-credit">crafted by <span>Aditya Vikram</span></div>
+</div>
+
+<!-- ===== APP ===== -->
+<div id="app">
+<div class="page-inner">
+
+    <div class="page-header">
+        <div class="logo">
+            <div class="logo-sus-badge">
+                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span class="logo-sus-text">SUS</span>
+            </div>
+            <div class="logo-divider"></div>
+            <div class="logo-name">Fluid<span>Share</span></div>
+        </div>
+        <a href="index.html" class="back-btn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            Back
+        </a>
+    </div>
+
+    <div class="single-card">
+        <div class="card receive" style="max-width:100%;">
+            <div class="card-header">
+                <div class="card-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                </div>
+                <div class="card-badge">Receive</div>
+            </div>
+
+            <div>
+                <div class="card-title">Get a File</div>
+                <div class="card-subtitle">Enter the room key and password from the sender to download directly.</div>
+            </div>
+
+            <div class="receive-placeholder" id="recv-placeholder">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="8" y1="12" x2="16" y2="12"/>
+                    <line x1="12" y1="8" x2="12" y2="16"/>
+                </svg>
+                <span>awaiting connection</span>
+            </div>
+
+            <div class="divider">room key</div>
+
+            <div class="field">
+                <label>Sender's Room Key</label>
+                <input type="text" id="receiver-room-key" placeholder="e.g. glacier-42" />
+            </div>
+
+            <div class="divider">encryption</div>
+
+            <div class="field">
+                <label>Password (if set by sender)</label>
+                <div class="password-row">
+                    <input type="password" id="receiver-password" placeholder="Enter shared password…" />
+                    <button class="toggle-pw-btn" onclick="togglePassword('receiver-password', this)" title="Toggle visibility">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <button class="btn btn-recv btn-full" onclick="connectAndDownload()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="8 17 12 21 16 17"/>
+                    <line x1="12" y1="12" x2="12" y2="21"/>
+                    <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/>
+                </svg>
+                Connect &amp; Download
+            </button>
+
+            <div class="progress-container" id="receiver-progress">
+                <div class="progress-bar-track">
+                    <div class="progress-bar-fill" id="receiver-progress-fill"></div>
+                </div>
+                <div class="progress-info">
+                    <span class="pct" id="receiver-pct">0%</span>
+                    <span id="receiver-speed"></span>
+                </div>
+            </div>
+
+            <div class="status-bar" id="receiver-status">Ready to connect…</div>
+        </div>
+    </div>
+
+</div>
+</div>
+
+<script src="script.js"></script>
+<script src="loader.js"></script>
+<script>
+    // Auto-fill room key from ?room= URL param
+    (function() {
+        const params = new URLSearchParams(window.location.search);
+        const room = params.get('room');
+        if (room) {
+            window.addEventListener('DOMContentLoaded', () => {
+                const el = document.getElementById('receiver-room-key');
+                if (el) el.value = room;
+            });
+        }
+    })();
+</script>
+</body>
+</html>

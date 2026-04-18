@@ -3,201 +3,447 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FluidShare — Drop. Share. Done.</title>
+    <title>SUS · FluidShare — Drop. Share. Done.</title>
+    <meta name="description" content="FluidShare by SUS — End-to-End Encrypted peer-to-peer file transfer.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="loader.css">
+    <style>
+        /* ── LANDING-SPECIFIC ── */
+        .landing {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            overflow: hidden;
+        }
+
+        /* Scan-line beam */
+        .scanline {
+            position: fixed;
+            top: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0;
+            animation: scanBeam 3s ease forwards;
+            z-index: 10;
+        }
+        @keyframes scanBeam {
+            0%   { top: 0;    opacity: 0; }
+            10%  { opacity: 1; }
+            90%  { opacity: 1; }
+            100% { top: 100vh; opacity: 0; }
+        }
+
+        /* Corner brackets */
+        .bracket {
+            position: fixed;
+            width: 28px;
+            height: 28px;
+            opacity: 0;
+            animation: bracketIn 0.6s ease 1.2s forwards;
+        }
+        .bracket-tl { top: 24px;  left: 24px;  border-top: 1px solid var(--accent); border-left: 1px solid var(--accent); }
+        .bracket-tr { top: 24px;  right: 24px; border-top: 1px solid var(--accent); border-right: 1px solid var(--accent); }
+        .bracket-bl { bottom: 24px; left: 24px;  border-bottom: 1px solid var(--accent); border-left: 1px solid var(--accent); }
+        .bracket-br { bottom: 24px; right: 24px; border-bottom: 1px solid var(--accent); border-right: 1px solid var(--accent); }
+        @keyframes bracketIn { from { opacity: 0; } to { opacity: 0.5; } }
+
+        /* Header */
+        .land-header {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 40px;
+            opacity: 0;
+            animation: fadeDown 0.7s ease 0.4s forwards;
+            z-index: 5;
+        }
+        @keyframes fadeDown {
+            from { opacity: 0; transform: translateY(-12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Hero text */
+        .land-hero {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+        }
+
+        .land-eyebrow {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--accent);
+            opacity: 0;
+            animation: fadeUp 0.6s ease 0.5s forwards;
+            margin-bottom: 28px;
+        }
+
+        /* Each word slides up from a clipped mask */
+        .word-wrap {
+            overflow: hidden;
+            display: inline-block;
+        }
+        .word {
+            display: inline-block;
+            font-family: var(--font-head);
+            font-size: clamp(52px, 10vw, 100px);
+            font-weight: 800;
+            letter-spacing: -3px;
+            line-height: 1;
+            color: var(--text);
+            transform: translateY(110%);
+            opacity: 0;
+        }
+        .word.accent { color: var(--accent); }
+        .word.red    { color: var(--send); }
+
+        .word-anim-1 { animation: wordReveal 0.9s cubic-bezier(.16,1,.3,1) 0.7s forwards; }
+        .word-anim-2 { animation: wordReveal 0.9s cubic-bezier(.16,1,.3,1) 1.0s forwards; }
+        .word-anim-3 { animation: wordReveal 0.9s cubic-bezier(.16,1,.3,1) 1.3s forwards; }
+
+        @keyframes wordReveal {
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .land-sep {
+            font-family: var(--font-head);
+            font-size: clamp(52px, 10vw, 100px);
+            font-weight: 800;
+            letter-spacing: -3px;
+            color: var(--text-dim);
+            display: inline-block;
+            opacity: 0;
+            animation: fadeIn 0.5s ease 1.15s forwards;
+            margin: 0 8px;
+        }
+        @keyframes fadeIn { to { opacity: 1; } }
+
+        .land-sub {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            color: var(--text-muted);
+            max-width: 380px;
+            line-height: 1.7;
+            text-align: center;
+            opacity: 0;
+            animation: fadeUp 0.7s ease 1.8s forwards;
+            margin-top: 28px;
+        }
+
+        /* Choice buttons */
+        .land-choices {
+            display: flex;
+            gap: 16px;
+            margin-top: 56px;
+            opacity: 0;
+            animation: fadeUp 0.7s ease 2.1s forwards;
+        }
+
+        .choice-btn {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 28px 32px;
+            border-radius: 12px;
+            border: 1px solid;
+            cursor: pointer;
+            text-decoration: none;
+            transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
+            min-width: 200px;
+            overflow: hidden;
+            background: var(--surface);
+        }
+
+        .choice-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .choice-btn:hover { transform: translateY(-4px); }
+        .choice-btn:hover::before { opacity: 1; }
+        .choice-btn:active { transform: translateY(-2px); }
+
+        .choice-btn.send {
+            border-color: rgba(255,77,77,0.3);
+        }
+        .choice-btn.send::before {
+            background: var(--send-dim);
+        }
+        .choice-btn.send:hover {
+            border-color: var(--send);
+            box-shadow: 0 8px 40px rgba(255,77,77,0.18);
+        }
+
+        .choice-btn.recv {
+            border-color: rgba(0,207,255,0.3);
+        }
+        .choice-btn.recv::before {
+            background: var(--recv-dim);
+        }
+        .choice-btn.recv:hover {
+            border-color: var(--recv);
+            box-shadow: 0 8px 40px rgba(0,207,255,0.18);
+        }
+
+        .choice-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            border: 1px solid;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .choice-btn.send .choice-icon {
+            color: var(--send);
+            background: rgba(255,77,77,0.12);
+            border-color: rgba(255,77,77,0.3);
+        }
+
+        .choice-btn.recv .choice-icon {
+            color: var(--recv);
+            background: rgba(0,207,255,0.10);
+            border-color: rgba(0,207,255,0.28);
+        }
+
+        .choice-label {
+            font-family: var(--font-head);
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text);
+            position: relative;
+            z-index: 1;
+        }
+
+        .choice-desc {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.6;
+            position: relative;
+            z-index: 1;
+        }
+
+        .choice-badge {
+            position: absolute;
+            top: 14px; right: 14px;
+            font-family: var(--font-mono);
+            font-size: 9px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid;
+        }
+        .choice-btn.send .choice-badge {
+            color: var(--send);
+            border-color: rgba(255,77,77,0.3);
+            background: rgba(255,77,77,0.08);
+        }
+        .choice-btn.recv .choice-badge {
+            color: var(--recv);
+            border-color: rgba(0,207,255,0.28);
+            background: rgba(0,207,255,0.07);
+        }
+
+        .choice-arrow {
+            position: absolute;
+            bottom: 20px; right: 20px;
+            opacity: 0.3;
+            transition: opacity 0.2s, transform 0.2s;
+        }
+        .choice-btn:hover .choice-arrow { opacity: 0.8; transform: translate(3px,-3px); }
+
+        /* Stats bar */
+        .land-stats {
+            display: flex;
+            gap: 32px;
+            margin-top: 56px;
+            opacity: 0;
+            animation: fadeUp 0.7s ease 2.4s forwards;
+        }
+        .stat {
+            text-align: center;
+        }
+        .stat-val {
+            font-family: var(--font-head);
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+        .stat-label {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--text-dim);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+        .stat-div {
+            width: 1px;
+            background: var(--border);
+            align-self: stretch;
+        }
+
+        /* Footer */
+        .land-footer {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px 40px;
+            opacity: 0;
+            animation: fadeIn 0.7s ease 2.6s forwards;
+        }
+        .land-footer p {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--text-dim);
+            letter-spacing: 0.5px;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 560px) {
+            .land-choices { flex-direction: column; }
+            .land-header  { padding: 16px 20px; }
+        }
+    </style>
 </head>
 <body>
 
-<!-- ===== LOADING SCREEN ===== -->
-<div id="loader">
-    <div class="particles" id="particles"></div>
+<!-- Scan-line sweep -->
+<div class="scanline"></div>
 
-    <div class="loader-logo">
-        <div class="loader-mark">
-            <div class="ring-outer"></div>
-            <div class="ring-inner"></div>
-            <svg viewBox="0 0 64 64" fill="none">
-                <path class="loader-diamond" d="M32 8 L56 32 L32 56 L8 32 Z"
-                    stroke-width="1.5" stroke-linejoin="round" fill="none"/>
-                <circle class="loader-dot-center" cx="32" cy="32" r="4"/>
+<!-- Corner brackets -->
+<div class="bracket bracket-tl"></div>
+<div class="bracket bracket-tr"></div>
+<div class="bracket bracket-bl"></div>
+<div class="bracket bracket-br"></div>
+
+<!-- Header -->
+<header class="land-header">
+    <div class="logo">
+        <div class="logo-sus-badge">
+            <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             </svg>
+            <span class="logo-sus-text">SUS</span>
         </div>
-        <div class="loader-name">Fluid<span>Share</span></div>
+        <div class="logo-divider"></div>
+        <div class="logo-name">Fluid<span>Share</span></div>
     </div>
 
-    <div class="loader-status">
-        <div class="loader-steps">
-            <div class="step-dot active" id="dot-0"></div>
-            <div class="step-dot" id="dot-1"></div>
-            <div class="step-dot" id="dot-2"></div>
-        </div>
-        <div id="loader-message">Initializing…</div>
+    <div id="connection-status">
+        <div class="status-dot"></div>
+        <span id="connection-status-text">E2E Encrypted</span>
     </div>
+</header>
 
-    <div class="loader-bar-track">
-        <div class="loader-bar-fill" id="loader-bar"></div>
-    </div>
+<!-- Landing -->
+<main class="landing">
+    <div class="land-hero">
+        <p class="land-eyebrow">E2E Encrypted · P2P · Zero uploads · AES-256</p>
 
-    <div class="loader-credit">
-        crafted by <span>Aditya Vikram</span>
-    </div>
-</div>
-
-<!-- ===== MAIN APP ===== -->
-<div id="app">
-<div class="page">
-
-    <header>
-        <div class="logo">
-            <div class="logo-mark">
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                    <path d="M3 9 L9 3 L15 9 L9 15 Z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
-                    <circle cx="9" cy="9" r="2" fill="currentColor"/>
-                </svg>
-            </div>
-            <div class="logo-name">Fluid<span>Share</span></div>
+        <!-- Animated headline -->
+        <div style="display:flex; align-items:baseline; flex-wrap:wrap; justify-content:center; gap: 0 18px;">
+            <div class="word-wrap"><span class="word word-anim-1">Drop.</span></div>
+            <div class="word-wrap"><span class="word accent word-anim-2">Share.</span></div>
+            <div class="word-wrap"><span class="word red word-anim-3">Done.</span></div>
         </div>
 
-        <div id="connection-status">
-            <div class="status-dot"></div>
-            <span id="connection-status-text">Connecting…</span>
-        </div>
-    </header>
+        <p class="land-sub">Transfer files directly between browsers.<br>Private by design. No server. No limit.</p>
 
-    <div class="hero">
-        <p class="hero-eyebrow">P2P · No Server · No Limit</p>
-        <h1>Drop. Share. <em>Done.</em></h1>
-        <p>Transfer files directly between browsers with zero uploads. Private by design.</p>
-    </div>
-
-    <div class="cards">
-
-        <!-- SEND CARD -->
-        <div class="card send">
-            <div class="card-header">
-                <div class="card-icon">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <!-- Choice -->
+        <div class="land-choices">
+            <a href="send.html" class="choice-btn send">
+                <span class="choice-badge">Sender</span>
+                <div class="choice-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                         <polyline points="17 8 12 3 7 8"/>
                         <line x1="12" y1="3" x2="12" y2="15"/>
                     </svg>
                 </div>
-                <div class="card-badge">Send</div>
-            </div>
-
-            <div>
-                <div class="card-title">Share a File</div>
-                <div class="card-subtitle">Create a room key and let someone connect to grab your file.</div>
-            </div>
-
-            <div class="drop-zone" id="drop-zone">
-                <input type="file" id="file-input" />
-                <div class="drop-zone-icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <polyline points="14 2 14 8 20 8"/>
-                        <line x1="12" y1="13" x2="12" y2="17"/>
-                        <polyline points="9 16 12 13 15 16"/>
-                    </svg>
-                </div>
-                <div class="drop-zone-label">
-                    <strong>Click or drag a file here</strong>
-                    Any format, any size
-                </div>
-                <div id="file-name"></div>
-            </div>
-
-            <div class="divider">room key</div>
-
-            <div class="field">
-                <label>Your Room Key</label>
-                <div class="input-row">
-                    <input type="text" id="sender-room-key" placeholder="e.g. glacier-42" />
-                    <button class="btn btn-send" onclick="generateKey()">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                            <path d="M23 7l-7 5 7 5V7z"/>
-                            <rect x="1" y="5" width="15" height="14" rx="2"/>
-                        </svg>
-                        Auto
-                    </button>
-                </div>
-            </div>
-
-            <button class="btn btn-send btn-full" onclick="createRoomAndShare()">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="18" cy="5" r="3"/>
-                    <circle cx="6" cy="12" r="3"/>
-                    <circle cx="18" cy="19" r="3"/>
-                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                <div class="choice-label">Send a File</div>
+                <div class="choice-desc">Create a room &amp; share<br>your file securely.</div>
+                <svg class="choice-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/>
                 </svg>
-                Create Room & Share
-            </button>
+            </a>
 
-            <div class="status-bar" id="sender-status">Waiting for setup…</div>
-        </div>
-
-        <!-- RECEIVE CARD -->
-        <div class="card receive">
-            <div class="card-header">
-                <div class="card-icon">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <a href="receive.html" class="choice-btn recv">
+                <span class="choice-badge">Receiver</span>
+                <div class="choice-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                         <polyline points="7 10 12 15 17 10"/>
                         <line x1="12" y1="15" x2="12" y2="3"/>
                     </svg>
                 </div>
-                <div class="card-badge">Receive</div>
-            </div>
-
-            <div>
-                <div class="card-title">Get a File</div>
-                <div class="card-subtitle">Enter the room key from the sender and download directly.</div>
-            </div>
-
-            <div class="receive-placeholder">
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"/>
-                    <line x1="8" y1="12" x2="16" y2="12"/>
-                    <line x1="12" y1="8" x2="12" y2="16"/>
+                <div class="choice-label">Get a File</div>
+                <div class="choice-desc">Enter a room key &amp;<br>download instantly.</div>
+                <svg class="choice-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/>
                 </svg>
-                <span>awaiting connection</span>
-            </div>
-
-            <div class="divider">room key</div>
-
-            <div class="field">
-                <label>Sender's Room Key</label>
-                <input type="text" id="receiver-room-key" placeholder="e.g. glacier-42" />
-            </div>
-
-            <button class="btn btn-recv btn-full" onclick="connectAndDownload()">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="8 17 12 21 16 17"/>
-                    <line x1="12" y1="12" x2="12" y2="21"/>
-                    <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/>
-                </svg>
-                Connect & Download
-            </button>
-
-            <div class="status-bar" id="receiver-status">Ready to connect…</div>
+            </a>
         </div>
 
+        <!-- Stats -->
+        <div class="land-stats">
+            <div class="stat">
+                <div class="stat-val">AES-256</div>
+                <div class="stat-label">Encryption</div>
+            </div>
+            <div class="stat-div"></div>
+            <div class="stat">
+                <div class="stat-val">P2P</div>
+                <div class="stat-label">Direct</div>
+            </div>
+            <div class="stat-div"></div>
+            <div class="stat">
+                <div class="stat-val">∞</div>
+                <div class="stat-label">File Size</div>
+            </div>
+            <div class="stat-div"></div>
+            <div class="stat">
+                <div class="stat-val">0</div>
+                <div class="stat-label">Stored</div>
+            </div>
+        </div>
     </div>
+</main>
 
-    <footer>
-        <p>Encrypted P2P via WebRTC &nbsp;·&nbsp; No data stored &nbsp;·&nbsp; Built with PeerJS</p>
-    </footer>
-
-</div>
-</div><!-- /#app -->
-
-<script src="script.js"></script>
-<script src="loader.js"></script>
+<!-- Footer -->
+<footer class="land-footer">
+    <p>Secure University Systems · FluidShare · crafted by Aditya Vikram</p>
+</footer>
 
 </body>
 </html>
