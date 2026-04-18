@@ -1,13 +1,25 @@
 /* =============================================
-   FLUIDSHARE — MAIN SCRIPT
+   FLUIDSHARE — MAIN SCRIPT (FIXED)
    script.js
 ============================================= */
 
-let peer;
+let senderPeer;
+let receiverPeer;
 let fileData;
 let fileName;
 
-// ---- Utility: set status message in a status bar ----
+// ---- Reliable PeerJS config using public STUN servers ----
+const PEER_CONFIG = {
+    config: {
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:global.stun.twilio.com:3478' }
+        ]
+    }
+};
+
+// ---- Utility: set status message ----
 const setStatus = (elementId, message, isError = false) => {
     const el = document.getElementById(elementId);
     if (el) {
@@ -16,28 +28,26 @@ const setStatus = (elementId, message, isError = false) => {
     }
 };
 
-// ---- Attach global connection status listeners to a peer object ----
+// ---- Attach connection status listeners ----
 const attachConnectionListeners = (peerObject) => {
     const statusContainer = document.getElementById('connection-status');
-    const statusText      = document.getElementById('connection-status-text');
+    const statusText = document.getElementById('connection-status-text');
 
     peerObject.on('open', id => {
-        statusContainer.classList.add('connected');
-        statusText.textContent = 'Connected to signaling server';
-
-        // Tell the loader it can dismiss
+        if (statusContainer) statusContainer.classList.add('connected');
+        if (statusText) statusText.textContent = 'Connected to signaling server';
         if (window.__onPeerReady) window.__onPeerReady();
     });
 
     peerObject.on('error', err => {
-        statusContainer.classList.remove('connected');
-        statusText.textContent = `Connection error: ${err.type}. Please refresh.`;
+        if (statusContainer) statusContainer.classList.remove('connected');
+        if (statusText) statusText.textContent = `Connection error: ${err.type}. Please refresh.`;
         console.error('PeerJS error:', err);
     });
 
     peerObject.on('disconnected', () => {
-        statusContainer.classList.remove('connected');
-        statusText.textContent = 'Disconnected. Please refresh.';
+        if (statusContainer) statusContainer.classList.remove('connected');
+        if (statusText) statusText.textContent = 'Disconnected. Please refresh.';
     });
 };
 
@@ -46,9 +56,9 @@ const attachConnectionListeners = (peerObject) => {
 // ============================================================
 
 function createRoomAndShare() {
-    const roomKey   = document.getElementById('sender-room-key').value.trim();
+    const roomKey = document.getElementById('sender-room-key').value.trim();
     const fileInput = document.getElementById('file-input');
-    const file      = fileInput.files[0];
+    const file = fileInput.files[0];
 
     if (!roomKey) {
         setStatus('sender-status', 'Please enter or generate a room key.', true);
@@ -59,29 +69,34 @@ function createRoomAndShare() {
         return;
     }
 
-    // Destroy old peer before creating a new one
-    if (peer) peer.destroy();
+    // Destroy old sender peer before creating a new one
+    if (senderPeer && !senderPeer.destroyed) senderPeer.destroy();
 
-    peer = new Peer(roomKey);
-    attachConnectionListeners(peer);
+    // ✅ FIX: Pass PEER_CONFIG for reliable STUN
+    senderPeer = new Peer(roomKey, PEER_CONFIG);
+    attachConnectionListeners(senderPeer);
 
-    peer.on('open', id => {
+    senderPeer.on('open', id => {
         setStatus('sender-status', 'Room created. Waiting for receiver…');
         fileName = file.name;
 
-        const reader    = new FileReader();
-        reader.onload   = (e) => { fileData = e.target.result; };
+        const reader = new FileReader();
+        reader.onload = (e) => { fileData = e.target.result; };
         reader.readAsArrayBuffer(file);
     });
 
-    peer.on('connection', conn => {
+    senderPeer.on('connection', conn => {
         setStatus('sender-status', 'Receiver connected. Sending file…');
+
+        conn.on('open', () => {
+            // Wait for data event before sending
+        });
 
         conn.on('data', data => {
             if (data === 'request-file' && fileData) {
                 conn.send({ fileData, fileName });
                 setStatus('sender-status', '✓ File sent successfully!');
-                setTimeout(() => conn.close(), 500);
+                setTimeout(() => conn.close(), 1000);
             }
         });
 
@@ -91,11 +106,14 @@ function createRoomAndShare() {
         });
     });
 
-    peer.on('error', err => {
+    senderPeer.on('error', err => {
         if (err.type === 'unavailable-id') {
             setStatus('sender-status', 'Room key already taken. Try another.', true);
+        } else if (err.type === 'peer-unavailable') {
+            setStatus('sender-status', 'Could not reach receiver. Are they connected?', true);
         } else {
             console.error('Sender PeerJS error:', err);
+            setStatus('sender-status', `Error: ${err.type}`, true);
         }
     });
 }
@@ -112,39 +130,52 @@ function connectAndDownload() {
         return;
     }
 
-    // Initialize receiver peer if needed
-    if (!peer || peer.destroyed) {
-        peer = new Peer();
-        attachConnectionListeners(peer);
-    }
+    // ✅ FIX: Always create a fresh receiver peer to avoid stale state
+    if (receiverPeer && !receiverPeer.destroyed) receiverPeer.destroy();
 
-    setStatus('receiver-status', 'Connecting to sender…');
-    const conn = peer.connect(roomKey);
+    receiverPeer = new Peer(PEER_CONFIG);  // random ID for receiver
+    attachConnectionListeners(receiverPeer);
 
-    conn.on('open', () => {
-        setStatus('receiver-status', 'Connected. Requesting file…');
-        conn.send('request-file');
+    // ✅ FIX: Wait for peer to open before connecting
+    receiverPeer.on('open', () => {
+        setStatus('receiver-status', 'Connecting to sender…');
+        const conn = receiverPeer.connect(roomKey, { reliable: true });
+
+        conn.on('open', () => {
+            setStatus('receiver-status', 'Connected. Requesting file…');
+            conn.send('request-file');
+        });
+
+        conn.on('data', data => {
+            setStatus('receiver-status', 'File received. Starting download…');
+
+            const blob = new Blob([data.fileData], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = data.fileName || 'downloaded_file';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            setStatus('receiver-status', '✓ Download complete!');
+            conn.close();
+        });
+
+        conn.on('error', err => {
+            console.error('Receiver conn error:', err);
+            setStatus('receiver-status', 'Connection failed. Check the room key.', true);
+        });
     });
 
-    conn.on('data', data => {
-        setStatus('receiver-status', 'File received. Starting download…');
-
-        const blob = new Blob([data.fileData], { type: 'application/octet-stream' });
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement('a');
-        a.href     = url;
-        a.download = data.fileName || 'downloaded_file';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        setStatus('receiver-status', '✓ Download complete!');
-    });
-
-    conn.on('error', err => {
-        console.error('Receiver conn error:', err);
-        setStatus('receiver-status', 'Connection failed. Check the room key.', true);
+    receiverPeer.on('error', err => {
+        console.error('Receiver peer error:', err);
+        if (err.type === 'peer-unavailable') {
+            setStatus('receiver-status', 'Sender not found. Is the room key correct?', true);
+        } else {
+            setStatus('receiver-status', `Error: ${err.type}. Please try again.`, true);
+        }
     });
 }
 
@@ -152,42 +183,35 @@ function connectAndDownload() {
 //  UI HELPERS
 // ============================================================
 
-// Auto room-key generator
 function generateKey() {
     const adjectives = ['arctic','cobalt','velvet','neon','amber','silent','drift','jade','onyx','solar','crystal','ember','nova','storm','lunar'];
-    const nouns      = ['wave','crane','shift','gate','spark','ridge','pulse','bloom','tide','zone','flare','peak','core','flux','beam'];
     const key = adjectives[Math.floor(Math.random() * adjectives.length)]
               + '-'
               + Math.floor(Math.random() * 90 + 10);
     document.getElementById('sender-room-key').value = key;
 }
 
-// Drop zone drag-and-drop
 document.addEventListener('DOMContentLoaded', () => {
-    const dropZone  = document.getElementById('drop-zone');
+    const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
     const fileNameEl = document.getElementById('file-name');
 
-    // File selected via click
     fileInput.addEventListener('change', () => {
         if (fileInput.files[0]) {
-            fileNameEl.textContent     = '📎 ' + fileInput.files[0].name;
-            fileNameEl.style.display   = 'block';
+            fileNameEl.textContent = '📎 ' + fileInput.files[0].name;
+            fileNameEl.style.display = 'block';
         }
     });
 
-    // Drag over
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
         dropZone.classList.add('drag-over');
     });
 
-    // Drag leave
     dropZone.addEventListener('dragleave', () => {
         dropZone.classList.remove('drag-over');
     });
 
-    // Drop
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
         dropZone.classList.remove('drag-over');
@@ -198,13 +222,10 @@ document.addEventListener('DOMContentLoaded', () => {
         dt.items.add(file);
         fileInput.files = dt.files;
 
-        fileNameEl.textContent   = '📎 ' + file.name;
+        fileNameEl.textContent = '📎 ' + file.name;
         fileNameEl.style.display = 'block';
     });
 
-    // Init peer on load (receiver path)
-    if (!peer) {
-        peer = new Peer();
-        attachConnectionListeners(peer);
-    }
+    // ✅ FIX: Don't auto-init a peer on load — only create when actually needed
+    // (avoids wasting a connection slot on every page load)
 });
