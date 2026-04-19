@@ -135,6 +135,7 @@ header {
     stroke: var(--accent);
     fill: none;
     stroke-width: 1.8;
+    display: block;
 }
 
 .logo-sus-text {
@@ -143,6 +144,8 @@ header {
     font-weight: 700;
     color: var(--accent);
     letter-spacing: 0.06em;
+    line-height: 1;
+    margin-top: 1px;
 }
 
 .logo-divider {
@@ -157,6 +160,7 @@ header {
     font-weight: 700;
     color: var(--text);
     letter-spacing: -0.2px;
+    line-height: 1;
 }
 
 .logo-name span {
