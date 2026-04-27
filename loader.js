@@ -6,6 +6,9 @@
 ============================================= */
 
 (function () {
+    const isRepeatVisit = sessionStorage.getItem('fluidshare_visited');
+    sessionStorage.setItem('fluidshare_visited', 'true');
+    const delayMultiplier = isRepeatVisit ? 0.25 : 1.0;
 
     // ---- Spawn falling particles ----
     const container = document.getElementById('particles');
@@ -83,9 +86,9 @@
 
     // Kick off immediately, then at timed intervals
     advanceStep();
-    setTimeout(advanceStep, 900);
-    setTimeout(advanceStep, 1800);
-    setTimeout(advanceStep, 2800);
+    setTimeout(advanceStep, 900 * delayMultiplier);
+    setTimeout(advanceStep, 1800 * delayMultiplier);
+    setTimeout(advanceStep, 2800 * delayMultiplier);
 
     // ---- Dismiss the loader ----
     const loader = document.getElementById('loader');

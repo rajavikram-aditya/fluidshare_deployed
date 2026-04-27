@@ -1,37 +1,62 @@
 /* =============================================
-   SUS · FLUIDSHARE — MAIN SCRIPT
+   SUS · FLUIDSHARE — MAIN SCRIPT  v2.0
    Secure University Systems · File Transfer
    script.js
    ─────────────────────────────────────────
    Features:
      • AES-256-GCM end‑to‑end encryption
      • PBKDF2 key derivation from password
-     • 64 KB chunked streaming with ACK
+     • Per-chunk encryption with unique IVs
+     • Lazy file.slice() streaming (no full RAM load)
+     • ACK-based flow control
      • Real-time progress / speed / ETA
+     • Robust STUN/TURN ICE configuration
 ============================================= */
 
 let senderPeer;
 let receiverPeer;
-let fileData;
-let fileName;
 
 const CHUNK_SIZE = 64 * 1024; // 64 KB
 
-// ---- Reliable PeerJS config using public STUN servers ----
+// ---- Robust ICE config: multiple STUN + free TURN fallback ----
 const PEER_CONFIG = {
     config: {
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:global.stun.twilio.com:3478' }
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' },
+            { urls: 'stun:global.stun.twilio.com:3478' },
+            { urls: 'stun:stun.relay.metered.ca:80' },
+            // Free TURN relay fallback (for restrictive NATs/firewalls)
+            {
+                urls: 'turn:a.relay.metered.ca:80',
+                username: 'e8dd65b92a0d42e5a034e627',
+                credential: 'mIB+aem1m/GYZQ8t'
+            },
+            {
+                urls: 'turn:a.relay.metered.ca:443',
+                username: 'e8dd65b92a0d42e5a034e627',
+                credential: 'mIB+aem1m/GYZQ8t'
+            },
+            {
+                urls: 'turn:a.relay.metered.ca:443?transport=tcp',
+                username: 'e8dd65b92a0d42e5a034e627',
+                credential: 'mIB+aem1m/GYZQ8t'
+            }
         ]
     }
 };
 
 // ============================================================
-//  ENCRYPTION ENGINE (Web Crypto API)
+//  ENCRYPTION ENGINE (Web Crypto API) — Per‑Chunk
 // ============================================================
 
+/**
+ * Derive an AES-256-GCM key from a password + salt.
+ * Uses PBKDF2 with 310,000 iterations (OWASP recommended).
+ */
 async function deriveKey(password, salt) {
     const enc = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
@@ -46,22 +71,34 @@ async function deriveKey(password, salt) {
     );
 }
 
-async function encryptBuffer(buffer, password) {
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const iv   = crypto.getRandomValues(new Uint8Array(12));
-    const key  = await deriveKey(password, salt);
+/**
+ * Encrypt a single chunk. Each chunk gets its own random 12-byte IV,
+ * which is prepended to the ciphertext for self-contained transport.
+ * Format: [12-byte IV | ciphertext+tag]
+ */
+async function encryptChunk(chunkBuffer, key) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
     const ciphertext = await crypto.subtle.encrypt(
         { name: 'AES-GCM', iv },
         key,
-        buffer
+        chunkBuffer
     );
-    return { ciphertext, salt: Array.from(salt), iv: Array.from(iv) };
+    // Combine IV + ciphertext into one ArrayBuffer for transport
+    const combined = new Uint8Array(12 + ciphertext.byteLength);
+    combined.set(iv, 0);
+    combined.set(new Uint8Array(ciphertext), 12);
+    return combined.buffer;
 }
 
-async function decryptBuffer(ciphertext, salt, iv, password) {
-    const key = await deriveKey(password, new Uint8Array(salt));
+/**
+ * Decrypt a single chunk. Extracts the 12-byte IV prefix, then decrypts.
+ */
+async function decryptChunk(encryptedBuffer, key) {
+    const data = new Uint8Array(encryptedBuffer);
+    const iv = data.slice(0, 12);
+    const ciphertext = data.slice(12);
     return crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv: new Uint8Array(iv) },
+        { name: 'AES-GCM', iv },
         key,
         ciphertext
     );
@@ -82,12 +119,20 @@ const setStatus = (elementId, message, isError = false) => {
 function formatBytes(bytes) {
     if (bytes === 0) return '0 B';
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
-function updateProgress(side, pct, speedBps) {
+function formatETA(seconds) {
+    if (!isFinite(seconds) || seconds <= 0) return '';
+    if (seconds < 60) return `~${Math.ceil(seconds)}s left`;
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.ceil(seconds % 60);
+    return `~${mins}m ${secs}s left`;
+}
+
+function updateProgress(side, pct, speedBps, etaSeconds) {
     const fill  = document.getElementById(`${side}-progress-fill`);
     const pctEl = document.getElementById(`${side}-pct`);
     const spdEl = document.getElementById(`${side}-speed`);
@@ -96,7 +141,12 @@ function updateProgress(side, pct, speedBps) {
     if (cont) cont.classList.add('active');
     if (fill) fill.style.width = pct + '%';
     if (pctEl) pctEl.textContent = Math.round(pct) + '%';
-    if (spdEl && speedBps > 0) spdEl.textContent = formatBytes(speedBps) + '/s';
+    if (spdEl) {
+        let info = '';
+        if (speedBps > 0) info += formatBytes(speedBps) + '/s';
+        if (etaSeconds) info += '  ' + formatETA(etaSeconds);
+        spdEl.textContent = info;
+    }
 }
 
 function togglePassword(inputId, btn) {
@@ -114,6 +164,21 @@ function copyShareLink() {
     const url = `${base}receive.html?room=${encodeURIComponent(key)}`;
     navigator.clipboard.writeText(url).then(() => {
         setStatus('sender-status', '✓ Receive link copied!');
+    });
+}
+
+function copyShareCode() {
+    const keyInput = document.getElementById('sender-room-key');
+    if (!keyInput || !keyInput.value) {
+        setStatus('sender-status', 'Generate a share code first.', true);
+        return;
+    }
+    navigator.clipboard.writeText(keyInput.value).then(() => {
+        setStatus('sender-status', '✓ Share code copied!');
+        setTimeout(() => setStatus('sender-status', ''), 3000);
+    }).catch(err => {
+        console.error('Copy failed', err);
+        setStatus('sender-status', 'Failed to copy to clipboard.', true);
     });
 }
 
@@ -136,12 +201,14 @@ const attachConnectionListeners = (peerObject) => {
 
     peerObject.on('disconnected', () => {
         if (statusContainer) statusContainer.classList.remove('connected');
-        if (statusText) statusText.textContent = 'Disconnected. Please refresh.';
+        if (statusText) statusText.textContent = 'Disconnected. Attempting reconnect…';
+        // Auto-reconnect on disconnect
+        try { peerObject.reconnect(); } catch (e) { /* already destroyed */ }
     });
 };
 
 // ============================================================
-//  SENDER LOGIC
+//  SENDER LOGIC — Streaming + Per‑Chunk Encryption
 // ============================================================
 
 function createRoomAndShare() {
@@ -151,7 +218,7 @@ function createRoomAndShare() {
     const file      = fileInput.files[0];
 
     if (!roomKey) {
-        setStatus('sender-status', 'Please enter or generate a room key.', true);
+        setStatus('sender-status', 'Please enter or generate a share code.', true);
         return;
     }
     if (!file) {
@@ -170,83 +237,96 @@ function createRoomAndShare() {
         // Show copy link button
         const copyBtn = document.getElementById('btn-copy-link');
         if (copyBtn) copyBtn.style.display = 'inline-flex';
-
-        fileName = file.name;
-        const reader = new FileReader();
-        reader.onload = (e) => { fileData = e.target.result; };
-        reader.readAsArrayBuffer(file);
     });
 
     senderPeer.on('connection', conn => {
         setStatus('sender-status', 'Receiver connected. Preparing file…');
 
+        // ---- State machine for ACK-driven streaming ----
+        let sendNextChunk = null;  // set after metadata ACK
+
         conn.on('data', async data => {
-            if (data === 'request-file' && fileData) {
+            // ① Receiver requested the file → send metadata
+            if (data === 'request-file') {
                 try {
-                    setStatus('sender-status', 'Encrypting & sending…');
+                    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+                    const encrypted = !!password;
 
-                    let payload;
-                    if (password) {
-                        // Encrypt
-                        const { ciphertext, salt, iv } = await encryptBuffer(fileData, password);
-                        payload = new Uint8Array(ciphertext);
-
-                        // Send metadata first
-                        conn.send({
-                            type: 'metadata',
-                            fileName,
-                            fileSize: payload.byteLength,
-                            encrypted: true,
-                            salt,
-                            iv,
-                            totalChunks: Math.ceil(payload.byteLength / CHUNK_SIZE)
-                        });
-                    } else {
-                        payload = new Uint8Array(fileData);
-                        conn.send({
-                            type: 'metadata',
-                            fileName,
-                            fileSize: payload.byteLength,
-                            encrypted: false,
-                            totalChunks: Math.ceil(payload.byteLength / CHUNK_SIZE)
-                        });
+                    // Derive key once if password is set
+                    let cryptoKey = null;
+                    let salt = null;
+                    if (encrypted) {
+                        salt = crypto.getRandomValues(new Uint8Array(16));
+                        cryptoKey = await deriveKey(password, salt);
+                        setStatus('sender-status', 'Key derived. Sending metadata…');
                     }
 
-                    // Chunked send
-                    const totalChunks = Math.ceil(payload.byteLength / CHUNK_SIZE);
+                    // Send metadata
+                    conn.send({
+                        type: 'metadata',
+                        fileName: file.name,
+                        fileSize: file.size,
+                        encrypted,
+                        salt: salt ? Array.from(salt) : null,
+                        totalChunks
+                    });
+
+                    // Prepare the chunk streamer (called on each ACK)
                     let chunkIndex = 0;
                     const startTime = Date.now();
 
-                    function sendNextChunk() {
+                    sendNextChunk = async () => {
                         if (chunkIndex >= totalChunks) {
                             conn.send({ type: 'done' });
                             setStatus('sender-status', '✓ File sent successfully!');
                             updateProgress('sender', 100, 0);
+                            sendNextChunk = null; // prevent further sends
                             return;
                         }
 
                         const start = chunkIndex * CHUNK_SIZE;
-                        const end   = Math.min(start + CHUNK_SIZE, payload.byteLength);
-                        const chunk = payload.slice(start, end);
+                        const end   = Math.min(start + CHUNK_SIZE, file.size);
 
-                        conn.send({ type: 'chunk', index: chunkIndex, data: chunk });
+                        // ★ Lazy read: only load THIS chunk from disk
+                        const slice = file.slice(start, end);
+                        let chunkBuffer = await slice.arrayBuffer();
+
+                        // ★ Per-chunk encryption (IV is embedded in payload)
+                        if (encrypted) {
+                            chunkBuffer = await encryptChunk(chunkBuffer, cryptoKey);
+                        }
+
+                        conn.send({
+                            type: 'chunk',
+                            index: chunkIndex,
+                            data: new Uint8Array(chunkBuffer)
+                        });
 
                         chunkIndex++;
                         const pct = (chunkIndex / totalChunks) * 100;
                         const elapsed = (Date.now() - startTime) / 1000;
-                        const speed = (chunkIndex * CHUNK_SIZE) / elapsed;
-                        updateProgress('sender', pct, speed);
-                        setStatus('sender-status', `Sending chunk ${chunkIndex}/${totalChunks}…`);
+                        const bytesSent = Math.min(chunkIndex * CHUNK_SIZE, file.size);
+                        const speed = elapsed > 0 ? bytesSent / elapsed : 0;
+                        const remaining = file.size - bytesSent;
+                        const eta = speed > 0 ? remaining / speed : 0;
 
-                        // Small delay for backpressure
-                        setTimeout(sendNextChunk, 5);
-                    }
+                        updateProgress('sender', pct, speed, eta);
+                        setStatus('sender-status', `Sending ${chunkIndex}/${totalChunks} · ${formatBytes(bytesSent)} of ${formatBytes(file.size)}`);
+                    };
 
-                    sendNextChunk();
                 } catch (err) {
                     console.error('Encryption/send error:', err);
                     setStatus('sender-status', 'Encryption error. Check password.', true);
                 }
+                return;
+            }
+
+            // ② ACK received → send next chunk
+            if (data === 'ack' || (data && data.type === 'ack')) {
+                if (sendNextChunk) {
+                    await sendNextChunk();
+                }
+                return;
             }
         });
 
@@ -258,7 +338,7 @@ function createRoomAndShare() {
 
     senderPeer.on('error', err => {
         if (err.type === 'unavailable-id') {
-            setStatus('sender-status', 'Room key already taken. Try another.', true);
+            setStatus('sender-status', 'Share code already taken. Try another.', true);
         } else if (err.type === 'peer-unavailable') {
             setStatus('sender-status', 'Could not reach receiver. Are they connected?', true);
         } else {
@@ -269,7 +349,7 @@ function createRoomAndShare() {
 }
 
 // ============================================================
-//  RECEIVER LOGIC
+//  RECEIVER LOGIC — Per‑Chunk Decryption + ACK Flow
 // ============================================================
 
 function connectAndDownload() {
@@ -287,68 +367,122 @@ function connectAndDownload() {
     receiverPeer = new Peer(PEER_CONFIG);  // random ID for receiver
     attachConnectionListeners(receiverPeer);
 
+    const ph = document.getElementById('recv-placeholder');
+    if (ph) {
+        ph.classList.add('loading');
+        const span = ph.querySelector('span');
+        if (span) span.innerText = 'connecting...';
+    }
+
+    let connTimeout = setTimeout(() => {
+        setStatus('receiver-status', 'Sender not found. Are they online? Check share code.', true);
+        if (ph) {
+            ph.classList.remove('loading');
+            const span = ph.querySelector('span');
+            if (span) span.innerText = 'awaiting connection';
+        }
+        if (receiverPeer && !receiverPeer.destroyed) receiverPeer.destroy();
+    }, 15000);
+
     receiverPeer.on('open', () => {
         setStatus('receiver-status', 'Connecting to sender…');
         const conn = receiverPeer.connect(roomKey, { reliable: true });
 
         let metadata = null;
-        const chunks = [];
+        const decryptedChunks = [];
         let startTime;
+        let cryptoKey = null;
 
         conn.on('open', () => {
+            clearTimeout(connTimeout);
+            if (ph) {
+                ph.classList.remove('loading');
+                const span = ph.querySelector('span');
+                if (span) span.innerText = 'receiving stream';
+            }
             setStatus('receiver-status', 'Connected. Requesting file…');
             conn.send('request-file');
         });
 
         conn.on('data', async data => {
-            // Handle metadata
+            // ---- Handle metadata ----
             if (data && data.type === 'metadata') {
                 metadata = data;
-                chunks.length = 0;
+                decryptedChunks.length = 0;
                 startTime = Date.now();
+
+                // Derive decryption key once if file is encrypted
+                if (metadata.encrypted) {
+                    if (!password) {
+                        setStatus('receiver-status', 'This file is encrypted. Please enter a password.', true);
+                        conn.close();
+                        return;
+                    }
+                    try {
+                        cryptoKey = await deriveKey(password, new Uint8Array(metadata.salt));
+                    } catch (err) {
+                        setStatus('receiver-status', 'Key derivation failed. Check password.', true);
+                        conn.close();
+                        return;
+                    }
+                }
+
                 setStatus('receiver-status', `Receiving: ${metadata.fileName} (${formatBytes(metadata.fileSize)})`);
+                // ACK metadata — tells sender to start streaming
+                conn.send('ack');
                 return;
             }
 
-            // Handle chunk
+            // ---- Handle chunk ----
             if (data && data.type === 'chunk') {
-                chunks.push(data.data);
-                const pct = ((data.index + 1) / metadata.totalChunks) * 100;
-                const elapsed = (Date.now() - startTime) / 1000;
-                const speed = ((data.index + 1) * CHUNK_SIZE) / elapsed;
-                updateProgress('receiver', pct, speed);
-                setStatus('receiver-status', `Receiving chunk ${data.index + 1}/${metadata.totalChunks}…`);
+                try {
+                    let plainChunk;
+                    if (metadata.encrypted) {
+                        // Per-chunk decryption (IV is embedded in first 12 bytes)
+                        plainChunk = await decryptChunk(data.data.buffer || data.data, cryptoKey);
+                    } else {
+                        plainChunk = data.data.buffer || data.data;
+                    }
+
+                    decryptedChunks.push(plainChunk);
+
+                    const chunksReceived = data.index + 1;
+                    const pct = (chunksReceived / metadata.totalChunks) * 100;
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    const bytesReceived = chunksReceived * CHUNK_SIZE;
+                    const speed = elapsed > 0 ? bytesReceived / elapsed : 0;
+                    const remaining = metadata.fileSize - bytesReceived;
+                    const eta = speed > 0 ? remaining / speed : 0;
+
+                    updateProgress('receiver', pct, speed, eta);
+                    setStatus('receiver-status', `Receiving ${chunksReceived}/${metadata.totalChunks} · ${formatBytes(bytesReceived)} of ${formatBytes(metadata.fileSize)}`);
+
+                    // ACK this chunk — tells sender to send next
+                    conn.send('ack');
+                } catch (err) {
+                    console.error('Chunk decryption error:', err);
+                    setStatus('receiver-status', 'Decryption failed. Wrong password?', true);
+                    conn.close();
+                }
                 return;
             }
 
-            // Handle done
+            // ---- Handle done ----
             if (data && data.type === 'done') {
                 try {
-                    setStatus('receiver-status', 'Reassembling file…');
+                    setStatus('receiver-status', 'Assembling file…');
 
-                    // Combine chunks
-                    const totalLength = chunks.reduce((s, c) => s + c.byteLength, 0);
+                    // Combine all decrypted chunks
+                    const totalLength = decryptedChunks.reduce((s, c) => s + c.byteLength, 0);
                     const combined = new Uint8Array(totalLength);
                     let offset = 0;
-                    for (const chunk of chunks) {
+                    for (const chunk of decryptedChunks) {
                         combined.set(new Uint8Array(chunk), offset);
                         offset += chunk.byteLength;
                     }
 
-                    let finalBuffer;
-                    if (metadata.encrypted) {
-                        if (!password) {
-                            setStatus('receiver-status', 'This file is encrypted. Please enter a password.', true);
-                            return;
-                        }
-                        setStatus('receiver-status', 'Decrypting…');
-                        finalBuffer = await decryptBuffer(combined.buffer, metadata.salt, metadata.iv, password);
-                    } else {
-                        finalBuffer = combined.buffer;
-                    }
-
                     // Trigger download
-                    const blob = new Blob([finalBuffer], { type: 'application/octet-stream' });
+                    const blob = new Blob([combined], { type: 'application/octet-stream' });
                     const url  = URL.createObjectURL(blob);
                     const a    = document.createElement('a');
                     a.href     = url;
@@ -356,14 +490,17 @@ function connectAndDownload() {
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+
+                    // Clean up object URL after a short delay
+                    setTimeout(() => URL.revokeObjectURL(url), 3000);
 
                     updateProgress('receiver', 100, 0);
                     setStatus('receiver-status', '✓ Download complete!');
+                    if (ph && ph.querySelector('span')) ph.querySelector('span').innerText = 'transfer complete';
                     conn.close();
                 } catch (err) {
-                    console.error('Decryption error:', err);
-                    setStatus('receiver-status', 'Decryption failed. Wrong password?', true);
+                    console.error('Assembly error:', err);
+                    setStatus('receiver-status', 'File assembly failed.', true);
                 }
                 return;
             }
@@ -381,20 +518,33 @@ function connectAndDownload() {
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
                 setStatus('receiver-status', '✓ Download complete!');
+                if (ph && ph.querySelector('span')) ph.querySelector('span').innerText = 'transfer complete';
                 conn.close();
             }
         });
 
         conn.on('error', err => {
+            clearTimeout(connTimeout);
+            if (ph) {
+                ph.classList.remove('loading');
+                const span = ph.querySelector('span');
+                if (span) span.innerText = 'awaiting connection';
+            }
             console.error('Receiver conn error:', err);
-            setStatus('receiver-status', 'Connection failed. Check the room key.', true);
+            setStatus('receiver-status', 'Connection failed. Check the share code.', true);
         });
     });
 
     receiverPeer.on('error', err => {
+        clearTimeout(connTimeout);
+        if (ph) {
+            ph.classList.remove('loading');
+            const span = ph.querySelector('span');
+            if (span) span.innerText = 'awaiting connection';
+        }
         console.error('Receiver peer error:', err);
         if (err.type === 'peer-unavailable') {
-            setStatus('receiver-status', 'Sender not found. Is the room key correct?', true);
+            setStatus('receiver-status', 'Sender not found. Is the share code correct?', true);
         } else {
             setStatus('receiver-status', `Error: ${err.type}. Please try again.`, true);
         }
@@ -428,9 +578,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('file-input');
     const fileNameEl = document.getElementById('file-name');
 
+    // Guard: only bind drop-zone events on send page
+    if (!dropZone || !fileInput || !fileNameEl) {
+        checkUrlForRoom();
+        return;
+    }
+
     fileInput.addEventListener('change', () => {
         if (fileInput.files[0]) {
-            fileNameEl.textContent = '📎 ' + fileInput.files[0].name;
+            const f = fileInput.files[0];
+            fileNameEl.textContent = '📎 ' + f.name + ' (' + formatBytes(f.size) + ')';
             fileNameEl.style.display = 'block';
         }
     });
@@ -454,7 +611,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dt.items.add(file);
         fileInput.files = dt.files;
 
-        fileNameEl.textContent = '📎 ' + file.name;
+        fileNameEl.textContent = '📎 ' + file.name + ' (' + formatBytes(file.size) + ')';
         fileNameEl.style.display = 'block';
     });
 

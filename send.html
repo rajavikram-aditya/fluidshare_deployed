@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SUS · FluidShare — Send a File</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="loader.css">
@@ -124,7 +124,7 @@
 
             <div>
                 <div class="card-title">Share a File</div>
-                <div class="card-subtitle">Create a room key, set a password, and let someone connect to grab your file.</div>
+                <div class="card-subtitle">Generate a share code, set a password, and let someone connect to grab your file.</div>
             </div>
 
             <div class="drop-zone" id="drop-zone">
@@ -144,12 +144,18 @@
                 <div id="file-name"></div>
             </div>
 
-            <div class="divider">room key</div>
+            <div class="divider">share code</div>
 
             <div class="field">
-                <label>Your Room Key</label>
+                <label>Your Share Code</label>
                 <div class="input-row">
                     <input type="text" id="sender-room-key" placeholder="e.g. glacier-42" />
+                    <button class="btn btn-send icon-btn" title="Copy share code" onclick="copyShareCode()">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                    </button>
                     <button class="btn btn-send" onclick="generateKey()">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                             <path d="M23 7l-7 5 7 5V7z"/>
@@ -163,7 +169,7 @@
             <div class="divider">encryption</div>
 
             <div class="field">
-                <label>Password (optional)</label>
+                <label>Password (optional) <span class="field-hint">— Adds AES-256 encryption. Share this separately.</span></label>
                 <div class="password-row">
                     <input type="password" id="sender-password" placeholder="Set a shared password…" />
                     <button class="toggle-pw-btn" onclick="togglePassword('sender-password', this)" title="Toggle visibility">
@@ -174,13 +180,13 @@
                 </div>
             </div>
 
-            <button class="btn btn-send btn-full" onclick="createRoomAndShare()">
+            <button class="btn btn-send btn-full" id="btn-create-room" onclick="createRoomAndShare()">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
                     <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
                     <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
                 </svg>
-                Create Room &amp; Share
+                Start Sharing
             </button>
 
             <button class="btn btn-copy" id="btn-copy-link" onclick="copyShareLink()" style="display:none;">

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SUS · FluidShare — Receive a File</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="loader.css">
@@ -129,7 +129,7 @@
 
             <div>
                 <div class="card-title">Get a File</div>
-                <div class="card-subtitle">Enter the room key and password from the sender to download directly.</div>
+                <div class="card-subtitle">Enter the share code and password from the sender to download directly.</div>
             </div>
 
             <div class="receive-placeholder" id="recv-placeholder">
@@ -141,10 +141,10 @@
                 <span>awaiting connection</span>
             </div>
 
-            <div class="divider">room key</div>
+            <div class="divider">share code</div>
 
             <div class="field">
-                <label>Sender's Room Key</label>
+                <label>Sender's Share Code</label>
                 <input type="text" id="receiver-room-key" placeholder="e.g. glacier-42" />
             </div>
 
@@ -162,13 +162,13 @@
                 </div>
             </div>
 
-            <button class="btn btn-recv btn-full" onclick="connectAndDownload()">
+            <button class="btn btn-recv btn-full" id="btn-connect" onclick="connectAndDownload()">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="8 17 12 21 16 17"/>
                     <line x1="12" y1="12" x2="12" y2="21"/>
                     <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/>
                 </svg>
-                Connect &amp; Download
+                Connect to Sender
             </button>
 
             <div class="progress-container" id="receiver-progress">

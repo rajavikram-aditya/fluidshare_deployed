@@ -10,6 +10,11 @@
     padding: 0;
 }
 
+*:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
 :root {
     /* SUS Design Tokens */
     --bg:          #0A192F;
@@ -37,9 +42,9 @@
     --danger-dim:  rgba(255, 77, 77, 0.12);
     --radius:      10px;
 
-    /* Fonts — original Syne + DM Mono */
+    /* Fonts — header Syne, body Inter, mono DM Mono */
     --font-head: 'Syne', sans-serif;
-    --font-body: 'Syne', sans-serif;
+    --font-body: 'Inter', sans-serif;
     --font-mono: 'DM Mono', monospace;
 }
 
@@ -462,6 +467,19 @@ header {
     text-transform: uppercase;
 }
 
+.receive-placeholder.loading {
+    color: var(--accent);
+}
+
+.receive-placeholder.loading svg {
+    stroke: var(--accent);
+    animation: spin 1.2s linear infinite;
+}
+
+@keyframes spin {
+    100% { transform: rotate(360deg); }
+}
+
 /* ---- PASSWORD FIELD ---- */
 .password-row {
     display: flex;
@@ -510,6 +528,15 @@ header {
     font-weight: 600;
 }
 
+.field-hint {
+    font-family: var(--font-body);
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: 400;
+}
+
 .input-row {
     display: flex;
     gap: 8px;
@@ -550,6 +577,12 @@ input[type="password"]:focus { border-color: rgba(0,207,255,0.5); }
     display: inline-flex;
     align-items: center;
     gap: 6px;
+}
+
+.icon-btn {
+    padding: 10px 10px;
+    width: auto;
+    justify-content: center;
 }
 
 .btn-send {

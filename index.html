@@ -6,7 +6,7 @@
     <title>SUS · FluidShare — Drop. Share. Done.</title>
     <meta name="description" content="FluidShare by SUS — End-to-End Encrypted peer-to-peer file transfer.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
         /* ── LANDING-SPECIFIC ── */
@@ -19,7 +19,7 @@
             align-items: center;
             justify-content: center;
             padding: 100px 20px 40px;
-            overflow: hidden;
+            overflow-x: hidden;
         }
 
         /* Scan-line beam */
@@ -153,6 +153,9 @@
             margin-top: 56px;
             opacity: 0;
             animation: fadeUp 0.7s ease 2.1s forwards;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
         }
 
         .choice-btn {
@@ -167,7 +170,8 @@
             cursor: pointer;
             text-decoration: none;
             transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
-            min-width: 200px;
+            flex: 1 1 200px;
+            max-width: 320px;
             overflow: hidden;
             background: var(--surface);
         }
@@ -318,7 +322,7 @@
             justify-content: center;
             padding: 16px 40px;
             opacity: 0;
-            animation: fadeIn 0.7s ease 2.6s forwards;
+            animation: fadeIn 0.7s ease 2.8s forwards;
         }
         .land-footer p {
             font-family: var(--font-mono);
@@ -327,14 +331,64 @@
             letter-spacing: 0.5px;
         }
 
+        .how-it-works {
+            display: flex;
+            gap: 16px;
+            margin-top: 64px;
+            opacity: 0;
+            animation: fadeUp 0.7s ease 2.6s forwards;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding-bottom: 60px; /* space for footer */
+        }
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--surface-2);
+            padding: 12px 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .step-num {
+            font-family: var(--font-head);
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--accent);
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--accent-dim);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .step-text {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+        .how-arrow {
+            display: flex;
+            align-items: center;
+            color: var(--border-hover);
+            font-family: var(--font-mono);
+        }
+
         @keyframes fadeUp {
             from { opacity: 0; transform: translateY(16px); }
             to   { opacity: 1; transform: translateY(0); }
         }
 
-        @media (max-width: 560px) {
+        @media (max-width: 768px) {
+            .how-arrow { display: none; }
+            .how-it-works { flex-direction: column; align-items: stretch; gap: 8px; }
             .land-choices { flex-direction: column; }
             .land-header  { padding: 16px 20px; }
+            .how-it-works { margin-top: 40px; }
+            .land-stats { flex-wrap: wrap; justify-content: center; gap: 20px; }
+            .stat-div { display: none; }
         }
     </style>
 </head>
@@ -439,7 +493,25 @@
                 <div class="stat-label">Stored</div>
             </div>
         </div>
-    </div>
+        </div>
+
+        <!-- How it Works -->
+        <div class="how-it-works">
+            <div class="step">
+                <div class="step-num">1</div>
+                <div class="step-text">Sender selects a file &amp;<br>generates a Share Code</div>
+            </div>
+            <div class="how-arrow">→</div>
+            <div class="step">
+                <div class="step-num">2</div>
+                <div class="step-text">Receiver enters the<br>Share Code &amp; Connects</div>
+            </div>
+            <div class="how-arrow">→</div>
+            <div class="step">
+                <div class="step-num">3</div>
+                <div class="step-text">File transfers directly<br>via securely encrypted peer-to-peer</div>
+            </div>
+        </div>
 </main>
 
 <!-- Footer -->
