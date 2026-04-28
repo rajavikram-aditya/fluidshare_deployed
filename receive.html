@@ -177,6 +177,7 @@
                 </div>
                 <div class="progress-info">
                     <span class="pct" id="receiver-pct">0%</span>
+                    <span id="recv-speed" style="font-family:var(--font-mono); font-size:10px; color:var(--accent); margin-left:8px;"></span>
                     <span id="receiver-speed"></span>
                 </div>
             </div>
@@ -199,6 +200,8 @@
             window.addEventListener('DOMContentLoaded', () => {
                 const el = document.getElementById('receiver-room-key');
                 if (el) el.value = room;
+                const connectBtn = document.getElementById('btn-connect');
+                if (connectBtn) connectBtn.focus();
             });
         }
     })();

@@ -157,13 +157,18 @@ function togglePassword(inputId, btn) {
     btn.title = isHidden ? 'Hide password' : 'Show password';
 }
 
-function copyShareLink() {
+function getShareUrl() {
     const key = document.getElementById('sender-room-key').value.trim();
-    if (!key) return;
-    const base = location.href.replace(/\/[^/]*$/, '/');
-    const url = `${base}receive.html?room=${encodeURIComponent(key)}`;
+    if (!key) return '';
+    return `${location.origin}/receive.html?room=${encodeURIComponent(key)}`;
+}
+
+function copyShareLink() {
+    const url = getShareUrl();
+    if (!url) return;
     navigator.clipboard.writeText(url).then(() => {
         setStatus('sender-status', '✓ Receive link copied!');
+        setTimeout(() => setStatus('sender-status', ''), 3000);
     });
 }
 
@@ -234,9 +239,29 @@ function createRoomAndShare() {
 
     senderPeer.on('open', id => {
         setStatus('sender-status', 'Room created. Waiting for receiver…');
-        // Show copy link button
-        const copyBtn = document.getElementById('btn-copy-link');
-        if (copyBtn) copyBtn.style.display = 'inline-flex';
+
+        // Show share link section
+        const shareSection = document.getElementById('share-link-section');
+        if (shareSection) shareSection.style.display = 'block';
+
+        // Generate QR code
+        const shareUrl = getShareUrl();
+        const qrWrap = document.getElementById('qr-wrap');
+        const qrEl = document.getElementById('qr-code');
+        if (qrWrap && qrEl && typeof QRCode !== 'undefined' && shareUrl) {
+            qrEl.innerHTML = '';
+            new QRCode(qrEl, {
+                text: shareUrl,
+                width: 120,
+                height: 120,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.M
+            });
+            qrWrap.style.display = 'block';
+            const qrLabel = document.getElementById('qr-label');
+            if (qrLabel) qrLabel.style.display = 'block';
+        }
     });
 
     senderPeer.on('connection', conn => {
@@ -374,15 +399,20 @@ function connectAndDownload() {
         if (span) span.innerText = 'connecting...';
     }
 
+    // Speed tracking state
+    let bytesThisSecond = 0;
+    let speedInterval = null;
+    const speedEl = document.getElementById('recv-speed');
+
     let connTimeout = setTimeout(() => {
-        setStatus('receiver-status', 'Sender not found. Are they online? Check share code.', true);
+        setStatus('receiver-status', 'Could not reach sender. Check room key or ask sender to refresh.', true);
         if (ph) {
             ph.classList.remove('loading');
             const span = ph.querySelector('span');
             if (span) span.innerText = 'awaiting connection';
         }
         if (receiverPeer && !receiverPeer.destroyed) receiverPeer.destroy();
-    }, 15000);
+    }, 10000);
 
     receiverPeer.on('open', () => {
         setStatus('receiver-status', 'Connecting to sender…');
@@ -401,6 +431,16 @@ function connectAndDownload() {
                 if (span) span.innerText = 'receiving stream';
             }
             setStatus('receiver-status', 'Connected. Requesting file…');
+
+            // Start speed tracking interval
+            speedInterval = setInterval(() => {
+                if (speedEl) {
+                    const mbps = bytesThisSecond / 1048576;
+                    speedEl.textContent = mbps > 0 ? `${mbps.toFixed(1)} MB/s` : '';
+                }
+                bytesThisSecond = 0;
+            }, 1000);
+
             conn.send('request-file');
         });
 
@@ -439,12 +479,24 @@ function connectAndDownload() {
                     let plainChunk;
                     if (metadata.encrypted) {
                         // Per-chunk decryption (IV is embedded in first 12 bytes)
-                        plainChunk = await decryptChunk(data.data.buffer || data.data, cryptoKey);
+                        try {
+                            plainChunk = await decryptChunk(data.data.buffer || data.data, cryptoKey);
+                        } catch (decErr) {
+                            console.error('Decryption failed:', decErr);
+                            setStatus('receiver-status', 'Wrong password — decryption failed.', 'error');
+                            if (speedInterval) clearInterval(speedInterval);
+                            if (speedEl) speedEl.textContent = '';
+                            conn.close();
+                            return;
+                        }
                     } else {
                         plainChunk = data.data.buffer || data.data;
                     }
 
                     decryptedChunks.push(plainChunk);
+
+                    // Track bytes for speed display
+                    bytesThisSecond += plainChunk.byteLength;
 
                     const chunksReceived = data.index + 1;
                     const pct = (chunksReceived / metadata.totalChunks) * 100;
@@ -460,8 +512,10 @@ function connectAndDownload() {
                     // ACK this chunk — tells sender to send next
                     conn.send('ack');
                 } catch (err) {
-                    console.error('Chunk decryption error:', err);
+                    console.error('Chunk processing error:', err);
                     setStatus('receiver-status', 'Decryption failed. Wrong password?', true);
+                    if (speedInterval) clearInterval(speedInterval);
+                    if (speedEl) speedEl.textContent = '';
                     conn.close();
                 }
                 return;
@@ -470,6 +524,10 @@ function connectAndDownload() {
             // ---- Handle done ----
             if (data && data.type === 'done') {
                 try {
+                    // Stop speed tracking
+                    if (speedInterval) clearInterval(speedInterval);
+                    if (speedEl) speedEl.textContent = '';
+
                     setStatus('receiver-status', 'Assembling file…');
 
                     // Combine all decrypted chunks
@@ -496,11 +554,29 @@ function connectAndDownload() {
 
                     updateProgress('receiver', 100, 0);
                     setStatus('receiver-status', '✓ Download complete!');
-                    if (ph && ph.querySelector('span')) ph.querySelector('span').innerText = 'transfer complete';
+
+                    // Show transfer complete summary card
+                    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                    if (ph) {
+                        ph.innerHTML = `
+                            <div class="transfer-summary">
+                                <div class="transfer-summary-icon">✓</div>
+                                <div class="transfer-summary-title">Transfer complete</div>
+                                <div class="transfer-summary-row"><span>File</span><span>${metadata.fileName}</span></div>
+                                <div class="transfer-summary-row"><span>Size</span><span>${formatBytes(metadata.fileSize)}</span></div>
+                                <div class="transfer-summary-row"><span>Time</span><span>${elapsed}s</span></div>
+                                <button class="btn btn-recv btn-full" onclick="resetReceiverForm()" style="margin-top:12px; font-size:12px;">Transfer Another</button>
+                            </div>
+                        `;
+                        ph.style.borderColor = 'rgba(0, 207, 255, 0.35)';
+                    }
+
                     conn.close();
                 } catch (err) {
                     console.error('Assembly error:', err);
                     setStatus('receiver-status', 'File assembly failed.', true);
+                    if (speedInterval) clearInterval(speedInterval);
+                    if (speedEl) speedEl.textContent = '';
                 }
                 return;
             }
@@ -563,13 +639,48 @@ function generateKey() {
     document.getElementById('sender-room-key').value = key;
 }
 
+// Reset receiver form for another transfer
+function resetReceiverForm() {
+    const ph = document.getElementById('recv-placeholder');
+    if (ph) {
+        ph.innerHTML = `
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="8" y1="12" x2="16" y2="12"/>
+                <line x1="12" y1="8" x2="12" y2="16"/>
+            </svg>
+            <span>awaiting connection</span>
+        `;
+        ph.style.borderColor = '';
+    }
+    document.getElementById('receiver-room-key').value = '';
+    document.getElementById('receiver-password').value = '';
+    setStatus('receiver-status', 'Ready to connect…');
+
+    // Reset progress
+    const progContainer = document.getElementById('receiver-progress');
+    if (progContainer) progContainer.classList.remove('active');
+    const fill = document.getElementById('receiver-progress-fill');
+    if (fill) fill.style.width = '0%';
+    const pctEl = document.getElementById('receiver-pct');
+    if (pctEl) pctEl.textContent = '0%';
+    const spdEl = document.getElementById('receiver-speed');
+    if (spdEl) spdEl.textContent = '';
+    const recvSpd = document.getElementById('recv-speed');
+    if (recvSpd) recvSpd.textContent = '';
+}
+
 // Auto-populate room key from URL if ?room=xxx is present
 function checkUrlForRoom() {
     const params = new URLSearchParams(window.location.search);
     const room = params.get('room');
     if (room) {
         const receiverInput = document.getElementById('receiver-room-key');
-        if (receiverInput) receiverInput.value = room;
+        if (receiverInput) {
+            receiverInput.value = room;
+            const connectBtn = document.getElementById('btn-connect');
+            if (connectBtn) connectBtn.focus();
+        }
     }
 }
 

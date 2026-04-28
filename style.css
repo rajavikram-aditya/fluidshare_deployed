@@ -798,6 +798,81 @@ footer p {
     to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ---- TRANSFER SUMMARY CARD ---- */
+.transfer-summary {
+    width: 100%;
+    text-align: center;
+}
+
+.transfer-summary-icon {
+    font-size: 28px;
+    color: var(--accent);
+    margin-bottom: 8px;
+}
+
+.transfer-summary-title {
+    font-family: var(--font-head);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 14px;
+    letter-spacing: -0.2px;
+}
+
+.transfer-summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-soft);
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+
+.transfer-summary-row span:first-child {
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.transfer-summary-row span:last-child {
+    color: var(--text);
+    word-break: break-all;
+    text-align: right;
+    max-width: 65%;
+}
+
+/* ---- QR CODE WRAPPER ---- */
+#qr-wrap {
+    padding: 16px;
+    border-radius: 8px;
+    background: #ffffff;
+    border: 1px solid var(--border-soft);
+}
+
+#qr-code {
+    display: inline-block;
+    border-radius: 4px;
+    overflow: hidden;
+    line-height: 0;
+}
+
+#qr-code img,
+#qr-code canvas {
+    display: block;
+}
+
+/* ---- SHARE LINK SECTION ---- */
+#share-link-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#share-link-section .btn-copy {
+    width: 100%;
+    justify-content: center;
+}
+
 /* ---- RESPONSIVE ---- */
 @media (max-width: 640px) {
     .cards { grid-template-columns: 1fr; }

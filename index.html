@@ -333,48 +333,51 @@
 
         .how-it-works {
             display: flex;
-            gap: 16px;
-            margin-top: 64px;
-            opacity: 0;
-            animation: fadeUp 0.7s ease 2.6s forwards;
+            gap: 0;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 860px;
+            margin-top: 40px;
             flex-wrap: wrap;
-            justify-content: center;
-            padding-bottom: 60px; /* space for footer */
         }
-        .step {
+        .hiw-step {
             display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 12px;
-            background: var(--surface-2);
-            padding: 12px 20px;
-            border-radius: 8px;
-            border: 1px solid var(--border);
+            gap: 6px;
+            padding: 10px 16px;
+            opacity: 0;
+            animation: fadeUp 0.6s ease forwards;
         }
-        .step-num {
-            font-family: var(--font-head);
-            font-size: 16px;
-            font-weight: 700;
+        .hiw-step:nth-child(1) { animation-delay: 1.6s; }
+        .hiw-step:nth-child(3) { animation-delay: 1.75s; }
+        .hiw-step:nth-child(5) { animation-delay: 1.9s; }
+        .hiw-icon {
             color: var(--accent);
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            background: var(--accent-dim);
             display: flex;
             align-items: center;
             justify-content: center;
-            flex-shrink: 0;
         }
-        .step-text {
-            font-size: 12px;
-            color: var(--text-muted);
-            line-height: 1.4;
-        }
-        .how-arrow {
-            display: flex;
-            align-items: center;
-            color: var(--border-hover);
+        .hiw-label {
             font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-dim);
+            letter-spacing: 0.04em;
+            text-align: center;
+            white-space: nowrap;
         }
+        .hiw-arrow {
+            font-family: var(--font-mono);
+            font-size: 16px;
+            color: var(--text-dim);
+            opacity: 0;
+            animation: fadeUp 0.5s ease forwards;
+            margin: 0 10px;
+            padding-bottom: 14px;
+        }
+        .hiw-arrow:nth-child(2) { animation-delay: 1.68s; }
+        .hiw-arrow:nth-child(4) { animation-delay: 1.83s; }
 
         @keyframes fadeUp {
             from { opacity: 0; transform: translateY(16px); }
@@ -382,11 +385,10 @@
         }
 
         @media (max-width: 768px) {
-            .how-arrow { display: none; }
-            .how-it-works { flex-direction: column; align-items: stretch; gap: 8px; }
+            .hiw-arrow { display: none; }
+            .how-it-works { flex-direction: column; gap: 4px; }
             .land-choices { flex-direction: column; }
             .land-header  { padding: 16px 20px; }
-            .how-it-works { margin-top: 40px; }
             .land-stats { flex-wrap: wrap; justify-content: center; gap: 20px; }
             .stat-div { display: none; }
         }
@@ -435,6 +437,40 @@
         </div>
 
         <p class="land-sub">Transfer files directly between browsers.<br>Private by design. No server. No limit.</p>
+
+        <!-- How It Works Strip -->
+        <div class="how-it-works">
+            <div class="hiw-step">
+                <div class="hiw-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                </div>
+                <div class="hiw-label">Drop a file</div>
+            </div>
+            <div class="hiw-arrow">→</div>
+            <div class="hiw-step">
+                <div class="hiw-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+                    </svg>
+                </div>
+                <div class="hiw-label">Share the key</div>
+            </div>
+            <div class="hiw-arrow">→</div>
+            <div class="hiw-step">
+                <div class="hiw-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                </div>
+                <div class="hiw-label">They download</div>
+            </div>
+        </div>
 
         <!-- Choice -->
         <div class="land-choices">
@@ -493,24 +529,6 @@
                 <div class="stat-label">Stored</div>
             </div>
         </div>
-        </div>
-
-        <!-- How it Works -->
-        <div class="how-it-works">
-            <div class="step">
-                <div class="step-num">1</div>
-                <div class="step-text">Sender selects a file &amp;<br>generates a Share Code</div>
-            </div>
-            <div class="how-arrow">→</div>
-            <div class="step">
-                <div class="step-num">2</div>
-                <div class="step-text">Receiver enters the<br>Share Code &amp; Connects</div>
-            </div>
-            <div class="how-arrow">→</div>
-            <div class="step">
-                <div class="step-num">3</div>
-                <div class="step-text">File transfers directly<br>via securely encrypted peer-to-peer</div>
-            </div>
         </div>
 </main>
 

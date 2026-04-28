@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="loader.css">
     <style>
@@ -189,13 +190,19 @@
                 Start Sharing
             </button>
 
-            <button class="btn btn-copy" id="btn-copy-link" onclick="copyShareLink()" style="display:none;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="9" y="9" width="13" height="13" rx="2"/>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                </svg>
-                Copy Share Link
-            </button>
+            <div id="share-link-section" style="display:none;">
+                <button class="btn btn-copy" id="btn-copy-link" onclick="copyShareLink()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                    Copy Share Link
+                </button>
+                <div id="qr-wrap" style="display:none; text-align:center; margin-top:8px;">
+                    <div id="qr-code"></div>
+                </div>
+                <div id="qr-label" style="display:none; font-family:var(--font-mono); font-size:10px; color:var(--text-dim); margin-top:6px; letter-spacing:0.05em; text-align:center;">Scan on mobile</div>
+            </div>
 
             <div class="progress-container" id="sender-progress">
                 <div class="progress-bar-track">
